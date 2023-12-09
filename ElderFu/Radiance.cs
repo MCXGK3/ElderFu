@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Collections;
 using Satchel.Futils;
 using UnityEngine.Rendering;
+using Steamworks;
 
 namespace ElderFu
 {
@@ -26,6 +27,7 @@ namespace ElderFu
         float r=10f;
         float ascendv = 3f;
         bool removed = false;
+        public WR wR = new() { timeMax = 0.02f, timeMin = 0.02f, realTime = false };
 
         private void Awake()
         {
@@ -39,6 +41,8 @@ namespace ElderFu
         }
         private void Start()
         {
+            wR.finishEvent = _con.GetAction<WaitRandom>("Arena 2 Idle", 0).finishEvent;
+            //Modding.Logger.Log(wR.finishEvent);
             bus.Add(_com.FsmVariables.GetFsmGameObject("Eye Beam Burst1").Value);
             bus.Add(_com.FsmVariables.GetFsmGameObject("Eye Beam Burst2").Value);
             bus.Add(_com.FsmVariables.GetFsmGameObject("Eye Beam Burst3").Value);
@@ -56,8 +60,9 @@ namespace ElderFu
             _cho.GetAction<SendRandomEventV3>("A1 Choice", 1).weights = new FsmFloat[] { 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f };
             _cho.GetAction<SendRandomEventV3>("A1 Choice", 1).eventMax = new FsmInt[] { 0, 0, 0, 999999999, 0, 0,0, 0 };
             _cho.GetAction<SendRandomEventV3>("A1 Choice", 1).missedMax = new FsmInt[] { 9999999, 9999999, 9999999, 9999999, 999999, 9999999, 9999999, 9999999 };
-            _con.GetAction<WaitRandom>("Arena 2 Idle", 0).timeMin = 0.02f;
-            _con.GetAction<WaitRandom>("Arena 2 Idle", 0).timeMax = 0.02f;
+            _con.GetAction<WaitRandom>("Arena 2 Idle", 0).timeMin = 0.7f;
+            _con.GetAction<WaitRandom>("Arena 2 Idle", 0).timeMax = 0.7f;
+            _com.GetAction<Wait>("Eb Extra Wait",0).time = 0f;
             _con.GetAction<Wait>("A2 Cast End", 1).time = 0f;
             _con.GetAction<DecelerateV2>("A2 Cast Antic", 2).deceleration = 1.5f;
             _cho.GetAction<SendRandomEventV3>("A2 Choice", 1).weights = new FsmFloat[] { 0f, 0f, 0f, 1f, 0f, 0f, };
@@ -68,6 +73,7 @@ namespace ElderFu
             _con.GetAction<SendEventByName>("Scream", 1).sendEvent = new FsmString() { Value = "ASCEND BEAM" };// _con.GetAction<SendEventByName>("Ascend Cast", 1).sendEvent;
             _com.InsertCustomAction("EB 1", () =>
             {
+                
                 List<GameObject> childs = new List<GameObject>();
                 bus[0].FindAllChildren(childs);
                 foreach (var beam in childs)
@@ -122,6 +128,7 @@ namespace ElderFu
             }, 0);
             _com.InsertCustomAction("EB 7", () =>
             {
+                StartCoroutine(Hold());
                 List<GameObject> childs = new List<GameObject>();
                 bus[0].FindAllChildren(childs);
                 foreach (var beam in childs)
@@ -131,6 +138,7 @@ namespace ElderFu
             }, 0);
             _com.InsertCustomAction("EB 8", () =>
             {
+                StartCoroutine(Hold());
                 List<GameObject> childs = new List<GameObject>();
                 bus[1].FindAllChildren(childs);
                 foreach (var beam in childs)
@@ -140,6 +148,7 @@ namespace ElderFu
             }, 0);
             _com.InsertCustomAction("EB 9", () =>
             {
+                StartCoroutine(Hold());
                 List<GameObject> childs = new List<GameObject>();
                 bus[2].FindAllChildren(childs);
                 foreach (var beam in childs)
@@ -166,11 +175,14 @@ namespace ElderFu
             SendEventByName plats = _con.GetAction<SendEventByName>("Plat Setup", 2);
             _con.RemoveAction("Plat Setup", 2);
             _con.GetState("Scream").AddAction(plats);
-           /* _com.InsertCustomAction("Aim", () =>
-            {
-                StartCoroutine(ThrowEyeBeam());
-            }, 6);
-            _com.GetAction<Wait>("Aim", 12).time = 4f;*/
+            /* _com.InsertCustomAction("Aim", () =>
+             {
+                 StartCoroutine(ThrowEyeBeam());
+             }, 6);
+             _com.GetAction<Wait>("Aim", 12).time = 4f;*/
+            _con.RemoveAction("Arena 2 Idle", 0);
+            _con.InsertAction("Arena 2 Idle", wR, 0);
+            
         }
 
         private IEnumerator ThrowEyeBeam()
@@ -225,6 +237,18 @@ namespace ElderFu
 
         }
 
+
+        private IEnumerator Hold()
+        {
+            wR.ok = false;
+            //ElderFu.Instance.Log("False!!!!!!!!!");
+            yield return new WaitForSeconds(0.5f);
+            wR.ok = false;
+            yield return new WaitForSeconds(0.3f);
+            //ElderFu.Instance.Log("True!!!!!!!!!");
+            wR.ok = true;
+            yield break;
+        }
         private void Update()
         {
             if(_con.ActiveStateName=="Ascend Cast")
@@ -248,12 +272,88 @@ namespace ElderFu
                 PlayMakerFSM _asc = pit.LocateMyFSM("Ascend");
                 _asc.RemoveTransition("Idle", "ASCEND");
                 removed = true;
-                Modding.Logger.Log("Have Removed Abyss Pit");
+                //Modding.Logger.Log("Have Removed Abyss Pit");
             }
         }
         private void OnDestroy()
         {
 
+        }
+    }
+}
+namespace ElderFu
+{
+    [ActionCategory(ActionCategory.Time)]
+    public class WR : FsmStateAction
+    {
+        [RequiredField]
+        public FsmFloat timeMin;
+
+        public FsmFloat timeMax;
+
+        public FsmEvent finishEvent;
+
+        public bool realTime;
+
+        private float time;
+
+        private float startTime;
+
+        private float timer;
+
+        public bool ok;
+
+        public override void Reset()
+        {
+            timeMin = 0f;
+            timeMax = 1f;
+            finishEvent = null;
+            realTime = false;
+            ok= false;
+        }
+
+        public override void OnEnter()
+        {
+            //ElderFu.Instance.Log("Enter OK");
+            time = Random.Range(timeMin.Value, timeMax.Value);
+            //ElderFu.Instance.Log("Enter OK");
+            if (time <= 0f)
+            {
+                base.Fsm.Event(finishEvent);
+                Finish();
+            }
+            else
+            {
+                startTime = FsmTime.RealtimeSinceStartup;
+                timer = 0f;
+            }
+        }
+
+        public override void OnUpdate()
+        {
+            if (realTime)
+            {
+                timer = FsmTime.RealtimeSinceStartup - startTime;
+            }
+            else
+            {
+                timer += Time.deltaTime;
+                //ElderFu.Instance.Log(timer);
+                //ElderFu.Instance.Log(ok);
+            }
+
+            if (timer >= time&&ok)
+            {
+                //ElderFu.Instance.Log("Finish OK");
+                Finish();
+                if (finishEvent != null)
+                {
+                    //ElderFu.Instance.Log("Event OK");
+                    //ElderFu.Instance.Log(finishEvent.Path);
+                    //ElderFu.Instance.Log(finishEvent.Name);
+                    base.Fsm.Event(finishEvent);
+                }
+            }
         }
     }
 }
