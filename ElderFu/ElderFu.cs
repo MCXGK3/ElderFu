@@ -23,6 +23,10 @@ namespace ElderFu
         {
             Instance = this;
         }
+        public override string GetVersion()
+        {
+            return "m.x.0.1";
+        }
         //public  new string Name = "laser hudiance";
 
         public override void Initialize(Dictionary<string, Dictionary<string, GameObject>> preloadedObjects)
