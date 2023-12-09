@@ -26,9 +26,26 @@ namespace ElderFu
         float anglev = 0.5f;
         float r=10f;
         float ascendv = 3f;
+        float sinv = 3f;
         bool removed = false;
+        bool active=false;
+        bool haveActive = false;
+        float random;
         public WR wR = new() { timeMax = 0.02f, timeMin = 0.02f, realTime = false };
 
+        private void BeamSetState(GameObject burst, string state)
+        {
+            List<GameObject> list = new List<GameObject>();
+            burst.FindAllChildren(list);
+            foreach(var beam in list)
+            {
+                if (beam.name.Contains("Beam"))
+                {
+                    beam.LocateMyFSM("Control").SetState(state);
+                }
+            }
+
+        }
         private void Awake()
         {
             _con = gameObject.LocateMyFSM("Control");
@@ -37,8 +54,16 @@ namespace ElderFu
             _tele = gameObject.LocateMyFSM("Teleport");
             _hm=gameObject.GetComponent<HealthManager>();
             knight =GameObject.Find("Knight");
+            On.HealthManager.TakeDamage += Active;
 
         }
+
+        private void Active(On.HealthManager.orig_TakeDamage orig, HealthManager self, HitInstance hitInstance)
+        {
+            active = true;
+            orig(self, hitInstance);
+        }
+
         private void Start()
         {
             wR.finishEvent = _con.GetAction<WaitRandom>("Arena 2 Idle", 0).finishEvent;
@@ -71,6 +96,13 @@ namespace ElderFu
             _con.GetAction<WaitRandom>("Final Idle", 0).timeMax = 0.02f;
             _con.GetAction<WaitRandom>("Final Idle", 0).timeMin = 0.02f;
             _con.GetAction<SendEventByName>("Scream", 1).sendEvent = new FsmString() { Value = "ASCEND BEAM" };// _con.GetAction<SendEventByName>("Ascend Cast", 1).sendEvent;
+            _com.GetAction<Wait>("EB 4", 5).time = 1.5f;
+            _com.GetAction<Wait>("EB 5", 6).time = 1.5f;
+            _com.GetAction<Wait>("EB 6", 6).time = 1.5f;
+            _com.GetAction<Wait>("EB 7", 9).time = 1.1f;
+            _com.GetAction<Wait>("EB 8", 9).time = 1.1f;
+            _com.GetAction<Wait>("EB 9", 9).time = 1.1f;
+
             _com.InsertCustomAction("EB 1", () =>
             {
                 
@@ -170,6 +202,7 @@ namespace ElderFu
                 GameObject ab = _com.FsmVariables.FindFsmGameObject("Ascend Beam").Value;
                 ab.GetComponent<tk2dSprite>().color= new Color(Random.Range(0.5f, 1f), Random.Range(0.5f, 1f), Random.Range(0.5f, 1f));
             }, 0);
+            //_con.GetAction<SendEventByName>("Ascend Cast", 1).delay = 3f;
             _con.GetAction<SendEventByName>("Ascend Cast", 1).sendEvent = new FsmString() { Value = "RAGE EYES" };
             _con.GetAction<FloatCompare>("Ascend Cast", 3).float2 = 157f;
             SendEventByName plats = _con.GetAction<SendEventByName>("Plat Setup", 2);
@@ -182,6 +215,7 @@ namespace ElderFu
              _com.GetAction<Wait>("Aim", 12).time = 4f;*/
             _con.RemoveAction("Arena 2 Idle", 0);
             _con.InsertAction("Arena 2 Idle", wR, 0);
+            //_con.InsertAction("Ascend Cast",new SendEventByName() { delay=0f,everyFrame=false,sendEvent=new FsmString(){Value="" })
             
         }
 
@@ -258,9 +292,28 @@ namespace ElderFu
                 //gameObject.transform.position = knight.transform.position - new Vector3(0,1.4f,0);
                 //gameObject.transform.SetPositionY(knight.transform.position.y);
                 gameObject.transform.SetPositionY(gameObject.transform.position.y+ Time.deltaTime * ascendv);
+                gameObject.transform.SetPositionX(63.3f + Mathf.Sin(gameObject.transform.position.y/5f+random) * 10);
                 if (gameObject.transform.position.y - knight.transform.position.y > 10f)
                 {
-                    gameObject.transform.SetPositionY(40.7f);
+                    haveActive = false;
+                    active = false;
+                    foreach(var bu in bus)
+                    {
+                        BeamSetState(bu, "Inert");
+                        bu.SetActive(false);
+                    }
+                    random = Random.Range(0,Mathf.PI);
+                    gameObject.transform.SetPositionY(knight.transform.position.y-20f);
+                    gameObject.transform.SetPositionX(63.3f + Mathf.Sin(gameObject.transform.position.y / 5f+random) * 10);
+                }
+                if (active && !haveActive)
+                {
+                    haveActive=true;
+                    foreach (var bu in bus)
+                    {
+                        BeamSetState(bu, "Inert");
+                        bu.SetActive(true);
+                    }
                 }
 
 
@@ -277,7 +330,7 @@ namespace ElderFu
         }
         private void OnDestroy()
         {
-
+            On.HealthManager.TakeDamage -= Active;
         }
     }
 }
