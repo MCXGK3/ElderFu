@@ -25,7 +25,7 @@ namespace ElderFu
         }
         public override string GetVersion()
         {
-            return "m.x.0.1";
+            return "m.x.1.1";
         }
         //public  new string Name = "laser hudiance";
 
